@@ -1,0 +1,15 @@
+#+BEGIN_SRC scheme
+(gnc-get-current-root-account)
+
+(gnc-account-get-descendants-sorted)
+
+(gnc-account-get-full-name)
+
+(spawn-server (make-tcp-server-socket #:port 74146))
+
+WEBKIT_DISABLE_COMPOSITING_MODE=1 gnucash --debug --log gnc.scm=debug
+
+(find (lambda (acc) (equal? "Assets:Investments:invertir online:stocks:SPY" (gnc-account-get-full-name acc))) (gnc-account-get-descendants-sorted (gnc-get-current-root-account)))
+(exact->inexact (gnc:account-get-balance-interval (find (lambda (acc) (equal? "Expenses:Food:Groceries" (gnc-account-get-full-name acc))) (gnc-account-get-descendants-sorted (gnc-get-current-root-account))) (gnc-dmy2time64 01 03 2024) (gnc-dmy2time64 24 03 2024) #t))
+#+END_SRC
+
