@@ -97,7 +97,7 @@
 
        (all-accounts (append (charity-account-list) (retirement-fund-account-list) (emergency-fund-account-list) (housing-account-list) (utilities-account-list) (groceries-account-list) (transportation-account-list) (clothing-account-list) (medical-health-account-list) (personal-expenses-account-list) (recreation-account-list) (debt-account-list)))
 
-       (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account->monetary acc-name '(01 03 2024) '(01 04 2024))) accs)))))
+       (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name '(01 03 2024) '(01 04 2024))) accs)))))
 
 
     (gnc:html-table-append-row! table (list "Item" "Sub item" "Subtotal" "total" "actual" "difference"))
@@ -200,30 +200,15 @@
 (define (get-all-accounts)
   (gnc-account-get-descendants-sorted (gnc-get-current-root-account)))
 
-(get-all-accounts)
-
-;; (get-account-by-name "Assets:Investments:invertir online:stocks:SPY")
-;; (cadr ((get-comm-account-balance (get-account-by-name "Assets:Investments:invertir online:stocks:SPY") '(01 03 2024) '(01 04 2024)) 'getpair (xaccAccountGetCommodity (get-account-by-name "Assets:Investments:invertir online:stocks:SPY")) #f))
-
-
 (define (get-account-by-name full-name)
   (let ((func (lambda (acc) (equal? full-name (gnc-account-get-full-name acc)))))
     (find func (gnc-account-get-descendants-sorted (gnc-get-current-root-account)))))
-
-(let* ((account (get-account-by-name "Assets:Investments:invertir online:stocks:SPY"))
-       (commodity (get-account-by-name "Trading:CURRENCY:ARS")))
-  (gnc:exchange-by-pricedb-nearest (get-comm-account-balance account '(01 03 2024) '(28 03 2024)) (xaccAccountGetCommodity commodity) (gnc-dmy2time64 29 03 2024)))
-
 
 (define (get-account-balance account from to)
   (exact->inexact (gnc:account-get-balance-interval account (apply gnc-dmy2time64 from) (apply gnc-dmy2time64 to) #t)))
 
 (define (get-comm-account-balance account from to)
   ((gnc:account-get-comm-balance-interval account (apply gnc-dmy2time64 from) (apply gnc-dmy2time64 to) #t) 'getmonetary (xaccAccountGetCommodity account) #f))
-
-(get-comm-account-balance (get-account-by-name "Expenses:Food:Groceries") '(01 03 2024) '(28 03 2024))
-
-;; (get-account-by-name "Trading:CURRENCY:ARS")
 
 (export options-generator)
 (export document-renderer)
