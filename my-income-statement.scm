@@ -89,6 +89,8 @@
                                     optname-report-currency))
        (price-source (get-option gnc:pagename-general
                                  optname-price-source))
+       (init-date '(01 03 2024))
+       (end-date '(01 04 2024))
        (to-date-t64 (gnc:time64-end-day-time
                      (gnc-dmy2time64 28 03 2024)))
        (exchange-fn (gnc:case-exchange-fn
@@ -97,48 +99,48 @@
 
        (all-accounts (append (charity-account-list) (retirement-fund-account-list) (emergency-fund-account-list) (housing-account-list) (utilities-account-list) (groceries-account-list) (transportation-account-list) (clothing-account-list) (medical-health-account-list) (personal-expenses-account-list) (recreation-account-list) (debt-account-list)))
 
-       (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name '(01 03 2024) '(01 04 2024))) accs)))))
+       (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name init-date end-date)) accs)))))
 
 
     (gnc:html-table-append-row! table (list "Item" "Sub item" "Subtotal" "total" "actual" "difference"))
 
     (gnc:html-table-append-row! table (list "Charity" "-" "-" (sum-accounts (charity-account-list)) "?" "?"))
-    (add-to-table! (charity-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (charity-account-list) table init-date end-date)
 
     (let ((total-savings (sum-accounts (append (retirement-fund-account-list) (emergency-fund-account-list)))))
       (gnc:html-table-append-row! table (list "Savings" "-" "-" total-savings "?" "?")))
 
     (gnc:html-table-append-row! table (list "Retirement fund" "-" "-" "-" "-" "-"))
-    (add-to-table! (retirement-fund-account-list) table '(01 03 2024) '(01 04 2024) #:conversion-fn commodity->currency)
+    (add-to-table! (retirement-fund-account-list) table init-date end-date #:conversion-fn commodity->currency)
     (gnc:html-table-append-row! table (list "Emergency Fund" "-" "-" "?" "?" "?"))
-    (add-to-table! (emergency-fund-account-list) table '(01 03 2024) '(01 04 2024) #:conversion-fn commodity->currency)
+    (add-to-table! (emergency-fund-account-list) table init-date end-date #:conversion-fn commodity->currency)
 
     (gnc:html-table-append-row! table (list "Housing" "-" "-" (sum-accounts (housing-account-list)) "?" "?"))
-    (add-to-table! (housing-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (housing-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Utilities" "-" "-" (sum-accounts (utilities-account-list)) "?" "?"))
-    (add-to-table! (utilities-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (utilities-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Groceries" "-" "-" (sum-accounts (groceries-account-list)) "?" "?"))
-    (add-to-table! (groceries-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (groceries-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Transportation" "-" "-" (sum-accounts (transportation-account-list)) "?" "?"))
-    (add-to-table! (transportation-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (transportation-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Clothing" "-" "-" (sum-accounts (clothing-account-list)) "?" "?"))
-    (add-to-table! (clothing-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (clothing-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Medical/Health" "-" "-" (sum-accounts (medical-health-account-list)) "?" "?"))
-    (add-to-table! (medical-health-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (medical-health-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Personal" "-" "-" (sum-accounts (personal-expenses-account-list))  "?" "?"))
-    (add-to-table! (personal-expenses-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (personal-expenses-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Recreation" "-" "-" (sum-accounts (recreation-account-list))  "?" "?"))
-    (add-to-table! (recreation-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (recreation-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Debt" "-" "-" (sum-accounts (debt-account-list)) "?" "?"))
-    (add-to-table! (debt-account-list) table '(01 03 2024) '(01 04 2024))
+    (add-to-table! (debt-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Grand Total" "" "" "total" "actual" "difference"))
     (let ((total (gnc:monetary->string (sum-accounts all-accounts))))
