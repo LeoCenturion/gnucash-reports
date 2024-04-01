@@ -30,8 +30,14 @@
 (define optname-report-currency (N_ "Report's currency"))
 (define optname-price-source (N_ "Price Source"))
 (define optname-to-date (N_ "End Date"))
+(define optname-from-date (N_ "Start Date"))
+
 (define (options-generator)
   (let* ((options (gnc:new-options)))
+
+    (gnc:options-add-date-interval!
+     options gnc:pagename-general
+     optname-from-date optname-to-date "a")
 
     (gnc:options-add-currency!
      options gnc:pagename-general
@@ -47,60 +53,48 @@
 ;; ------------------------------------------------------------------
 ;; Render the HTML document
 ;; ------------------------------------------------------------------
+(define (get-option pagename optname report-obj)
+  (gnc:option-value
+   (gnc:lookup-option
+    (gnc:report-options report-obj) pagename optname)))
 
 (define (document-renderer report-obj)
-  (define (get-option pagename optname)
-    (gnc:option-value
-     (gnc:lookup-option
-      (gnc:report-options report-obj) pagename optname)))
-
-  ;; (let* ((report-currency (get-option gnc:pagename-general
-  ;;                                     optname-report-currency))
-  ;;        (price-source (get-option gnc:pagename-general
-  ;;                                  optname-price-source))
-  ;;        (to-date-t64 (gnc:time64-end-day-time
-  ;;                      (gnc-dmy2time64 28 03 2024)))
-  ;;        (exchange-fn (gnc:case-exchange-fn
-  ;;                      price-source report-currency to-date-t64))
-  ;;        (cc (get-comm-account-balance (get-account-by-name "Assets:Investments:invertir online:stocks:SPY") '(01 03 2024) '(01 04 2024)))
-  ;;        (commodity (apply gnc:make-gnc-monetary (cc 'getpair (xaccAccountGetCommodity (get-account-by-name "Assets:Investments:invertir online:stocks:SPY")) #f))))
-
-  ;;   ;; (gnc-numeric-convert
-  ;;   ;;  (gnc:gnc-monetary-amount (exchange-fn commodity report-currency))
-  ;;   ;;  (gnc-commodity-get-fraction commodity)
-  ;;   ;;  GNC-RND-ROUND)
-
-    
-  ;;   (gnc:debug "sum-collector")
-  ;;   (gnc:debug (gnc:sum-collector-commodity
-  ;;               cc  report-currency exchange-fn))
-
-  ;;   )
-
-
   (let*
       ((doc (gnc:make-html-document))
-       (table (gnc:make-html-table))
-       (report (gnc:make-html-text
-                (gnc:html-markup-h3
-                 (format #f (G_ "~a")
-                         gnc:optname-reportname))))
+       (table (expenses-table report-obj)))
+
+    (gnc:html-document-add-object! doc table)
+    (gnc:html-document-add-object! doc (gnc:make-html-text (gnc:html-markup-h1 "Total income")))
+
+
+    doc))
+
+(define (expenses-table report-obj)
+  (let*
+      ((table (gnc:make-html-table))
+       (get-option (lambda (page optname) (get-option page optname report-obj)))
        (report-currency (get-option gnc:pagename-general
                                     optname-report-currency))
        (price-source (get-option gnc:pagename-general
                                  optname-price-source))
-       (init-date '(01 03 2024))
-       (end-date '(01 04 2024))
+       (from-date-t64 (gnc:time64-start-day-time
+                       (gnc:date-option-absolute-time
+                        (get-option gnc:pagename-general
+                                    optname-from-date))))
        (to-date-t64 (gnc:time64-end-day-time
-                     (gnc-dmy2time64 28 03 2024)))
+                     (gnc:date-option-absolute-time
+                      (get-option gnc:pagename-general
+                                  optname-to-date))))
+       (init-date from-date-t64)
+       (end-date to-date-t64)
+       (exchange-date init-date)
        (exchange-fn (gnc:case-exchange-fn
-                     price-source report-currency to-date-t64))
+                     price-source report-currency exchange-date))
        (commodity->currency (lambda (cc) (gnc:sum-collector-commodity cc  report-currency exchange-fn)))
 
        (all-accounts (append (charity-account-list) (retirement-fund-account-list) (emergency-fund-account-list) (housing-account-list) (utilities-account-list) (groceries-account-list) (transportation-account-list) (clothing-account-list) (medical-health-account-list) (personal-expenses-account-list) (recreation-account-list) (debt-account-list)))
 
        (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name init-date end-date)) accs)))))
-
 
     (gnc:html-table-append-row! table (list "Item" "Sub item" "Subtotal" "total" "actual" "difference"))
 
@@ -145,14 +139,12 @@
     (gnc:html-table-append-row! table (list "Grand Total" "" "" "total" "actual" "difference"))
     (let ((total (gnc:monetary->string (sum-accounts all-accounts))))
       (gnc:html-table-append-row! table (list "" "" ""  total "?")))
-
-    (gnc:html-document-add-object! doc table)
-    doc))
+    table))
 
 (define*  (account-balance->monetary account-name from to #:key (domestic "Trading:CURRENCY:ARS"))
   (let* ((account-obj (get-account-by-name account-name)))
     (if (gnc:account-is-stock? account-obj)
-        (gnc:exchange-by-pricedb-nearest (get-comm-account-balance account-obj from to) (xaccAccountGetCommodity (get-account-by-name domestic)) (apply gnc-dmy2time64 to))
+        (gnc:exchange-by-pricedb-nearest (get-comm-account-balance account-obj from to) (xaccAccountGetCommodity (get-account-by-name domestic)) to)
         (get-comm-account-balance account-obj from to))))
 
 (define* (make-row account-full-name display-name from to #:key conversion-fn)
@@ -206,11 +198,11 @@
   (let ((func (lambda (acc) (equal? full-name (gnc-account-get-full-name acc)))))
     (find func (gnc-account-get-descendants-sorted (gnc-get-current-root-account)))))
 
-(define (get-account-balance account from to)
-  (exact->inexact (gnc:account-get-balance-interval account (apply gnc-dmy2time64 from) (apply gnc-dmy2time64 to) #t)))
+(define (get-account-balance account from_t64 to_t64)
+  (exact->inexact (gnc:account-get-balance-interval account from_t64 to_t64 #t)))
 
 (define (get-comm-account-balance account from to)
-  ((gnc:account-get-comm-balance-interval account (apply gnc-dmy2time64 from) (apply gnc-dmy2time64 to) #t) 'getmonetary (xaccAccountGetCommodity account) #f))
+  ((gnc:account-get-comm-balance-interval account  from to #t) 'getmonetary (xaccAccountGetCommodity account) #f))
 
 (export options-generator)
 (export document-renderer)
