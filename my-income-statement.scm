@@ -61,15 +61,49 @@
 (define (document-renderer report-obj)
   (let*
       ((doc (gnc:make-html-document))
-       (table (expenses-table report-obj)))
+       (expenses-table (make-expenses-table report-obj))
+       (income-table (make-income-table report-obj)))
 
-    (gnc:html-document-add-object! doc table)
+    (gnc:html-document-add-object! doc expenses-table)
     (gnc:html-document-add-object! doc (gnc:make-html-text (gnc:html-markup-h1 "Total income")))
-
-
+    (gnc:html-document-add-object! doc income-table)
     doc))
 
-(define (expenses-table report-obj)
+(define (make-income-table report-obj)
+  (let* ((table (gnc:make-html-table))
+         (get-option (lambda (page optname) (get-option page optname report-obj)))
+         (report-currency (get-option gnc:pagename-general
+                                 optname-report-currency))
+         (price-source (get-option gnc:pagename-general
+                                   optname-price-source))
+         (from-date-t64 (gnc:time64-start-day-time
+                         (gnc:date-option-absolute-time
+                          (get-option gnc:pagename-general
+                                      optname-from-date))))
+         (to-date-t64 (gnc:time64-end-day-time
+                       (gnc:date-option-absolute-time
+                        (get-option gnc:pagename-general
+                                    optname-to-date))))
+         (init-date from-date-t64)
+         (end-date to-date-t64)
+         (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name init-date end-date)) accs))))
+         (base-income (gnc:monetary-neg (account-balance->monetary "Income:Salary" from-date-t64 to-date-t64)))
+         (bonus-income (gnc:monetary-neg (account-balance->monetary "Income:Bonus" from-date-t64 to-date-t64)))
+         (reimbursments (gnc:monetary-neg (account-balance->monetary "Income:salesforce reimburstment" from-date-t64 to-date-t64)))
+         (deductions (sum-accounts (list "Expenses:Taxes:Deductions" "Expenses:Taxes:Ganancias")))
+         (gross-income (gnc:monetary+ base-income bonus-income reimbursments)))
+
+    (gnc:html-table-append-row! table (list "Base income" base-income))
+    (gnc:html-table-append-row! table (list "Bonus" bonus-income))
+    (gnc:html-table-append-row! table (list "Reimbursment" reimbursments))
+    (gnc:html-table-append-row! table (list "Gross Income" gross-income))
+    (gnc:html-table-append-row! table (list "Deductions" deductions))
+    (gnc:html-table-append-row! table (list "Net Income" (gnc:monetary+ gross-income (gnc:monetary-neg deductions))))
+
+
+    table))
+
+(define (make-expenses-table report-obj)
   (let*
       ((table (gnc:make-html-table))
        (get-option (lambda (page optname) (get-option page optname report-obj)))
@@ -107,7 +141,7 @@
     (gnc:html-table-append-row! table (list "Retirement fund" "-" "-" "-" "-" "-"))
     (add-to-table! (retirement-fund-account-list) table init-date end-date #:conversion-fn commodity->currency)
     (gnc:html-table-append-row! table (list "Emergency Fund" "-" "-" "?" "?" "?"))
-    (add-to-table! (emergency-fund-account-list) table init-date end-date #:conversion-fn commodity->currency)
+    (add-to-table! (emergency-fund-account-list) table init-date end-date)
 
     (gnc:html-table-append-row! table (list "Housing" "-" "-" (sum-accounts (housing-account-list)) "?" "?"))
     (add-to-table! (housing-account-list) table init-date end-date)
@@ -202,7 +236,7 @@
   (exact->inexact (gnc:account-get-balance-interval account from_t64 to_t64 #t)))
 
 (define (get-comm-account-balance account from to)
-  ((gnc:account-get-comm-balance-interval account  from to #t) 'getmonetary (xaccAccountGetCommodity account) #f))
+  ((gnc:account-get-comm-balance-interval account  from to #f) 'getmonetary (xaccAccountGetCommodity account) #f))
 
 (export options-generator)
 (export document-renderer)
