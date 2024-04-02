@@ -62,20 +62,60 @@
   (let*
       ((doc (gnc:make-html-document))
        (expenses-table (make-expenses-table report-obj))
-       (income-table (make-income-table report-obj)))
+       (income-table (make-income-table report-obj))
+       (expenses-classification-table (make-classification-table report-obj)))
 
     (gnc:html-document-add-object! doc expenses-table)
+    (gnc:html-document-add-object! doc (gnc:make-html-text (gnc:html-markup-h1 "Expenses by type")))
+    (gnc:html-document-add-object! doc expenses-classification-table)
     (gnc:html-document-add-object! doc (gnc:make-html-text (gnc:html-markup-h1 "Total income")))
     (gnc:html-document-add-object! doc income-table)
+
     doc))
+
+(define (make-classification-table report-obj)
+  (let* ((table (gnc:make-html-table))
+         (get-option (lambda (page optname) (get-option page optname report-obj)))
+         (report-currency (get-option gnc:pagename-general
+                                 optname-report-currency))
+         (from-date-t64 (gnc:time64-start-day-time
+                         (gnc:date-option-absolute-time
+                          (get-option gnc:pagename-general
+                                      optname-from-date))))
+         (to-date-t64 (gnc:time64-end-day-time
+                       (gnc:date-option-absolute-time
+                        (get-option gnc:pagename-general
+                                    optname-to-date))))
+         (init-date from-date-t64)
+         (end-date to-date-t64)
+         (sum-accounts (lambda (accs) (reduce gnc:monetary+ 0 (map (lambda (acc-name) (account-balance->monetary acc-name init-date end-date)) accs))))
+         (less-variable (append (utilities-account-list)
+                                '("Expenses:Food:Groceries")
+                                (transportation-account-list)
+                                '("Expenses:personal:Hair, Self care, & beauty" "Expenses:personal:Subscriptions" "Expenses:personal:Workout")
+                                '("Expenses:Taxes:AGIP")))
+         (variable-necessary (append '("Expenses:Home:Insurance" "Expenses:Home:Mobiliario" "Expenses:Home:Repair & Maintenance")
+                                     (charity-account-list)
+                                     (clothing-account-list)
+                                     '("Expenses:personal:Education" "Expenses:personal:Misc")))
+         (unnecessary (append '("Expenses:Food:Restaurant-Delivery" "Expenses:personal:Gifts")
+                              (recreation-account-list))))
+    (gnc:html-table-append-row! table (list "Less Variable" (sum-accounts less-variable)))
+    (gnc:html-table-append-row! table (list "Variable Necessary" (sum-accounts variable-necessary)))
+    (gnc:html-table-append-row! table (list "Unnecessary" (sum-accounts unnecessary)))
+    (gnc:html-table-append-row! table (list "Debt" (sum-accounts (debt-account-list))))
+    (gnc:html-table-append-row! table (list "Total" (gnc:monetary+ (sum-accounts  (debt-account-list))
+                                                                   (sum-accounts less-variable)
+                                                                   (sum-accounts variable-necessary)
+                                                                   (sum-accounts unnecessary))))
+    table))
+
 
 (define (make-income-table report-obj)
   (let* ((table (gnc:make-html-table))
          (get-option (lambda (page optname) (get-option page optname report-obj)))
          (report-currency (get-option gnc:pagename-general
                                  optname-report-currency))
-         (price-source (get-option gnc:pagename-general
-                                   optname-price-source))
          (from-date-t64 (gnc:time64-start-day-time
                          (gnc:date-option-absolute-time
                           (get-option gnc:pagename-general
@@ -200,7 +240,7 @@
 (define (emergency-fund-account-list) (list "Assets:Investments:Brokerage Account:Mutual Fund:HF Pesos" "Assets:Investments:Brokerage Account:Mutual Fund:HF Pesos PLUS"))
 (define (retirement-fund-account-list) (list "Assets:Investments:invertir online:stocks:SPY" "Assets:Investments:ESPP"))
 (define (utilities-account-list) (list "Expenses:Utilities:Electric" "Expenses:Utilities:Expensas" "Expenses:Utilities:Garbage collection" "Expenses:Utilities:Gas" "Expenses:Utilities:Internet" "Expenses:Utilities:Phone" "Expenses:Utilities:Water"))
-(define (housing-account-list) (list "Expenses:Home:Insurance" "Expenses:Home:Mobiliario" "Expenses:Home:Repair & Maintenance"))
+(define (housing-account-list) (list "Expenses:Home:Insurance" "Expenses:Home:Mobiliario" "Expenses:Home:Repair & Maintenance" "Expenses:Taxes:AGIP"))
 (define (medical-health-account-list) (list "Expenses:Medical Expenses:Medicine"))
 (define (personal-expenses-account-list) (list "Expenses:personal:Education" "Expenses:personal:Gifts" "Expenses:personal:Hair, Self care, & beauty" "Expenses:personal:Misc" "Expenses:personal:Subscriptions" "Expenses:personal:Throaway" "Expenses:personal:Workout"))
 (define (recreation-account-list) (list "Expenses:Entretainment:Recreation" "Expenses:Entretainment:Travel"))
